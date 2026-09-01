@@ -1,4 +1,5 @@
 using FlowLedger.Transactions.Api.Application.Commands.CreateTransaction;
+using FlowLedger.Transactions.Api.Application.Queries.GetTransaction;
 
 namespace FlowLedger.Transactions.Api.Endpoints;
 
@@ -29,6 +30,22 @@ public static class TransactionsEndpoints
         })
         .WithName("CreateTransaction")
         .WithSummary("Create a financial transaction by a merchant");
+
+        group.MapGet("/{id:guid}", async (
+            Guid id,
+            GetTransactionHandler handler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await handler.HandleAsync(
+                id,
+                cancellationToken);
+
+            return result is not null
+                ? Results.Ok(result)
+                : Results.NotFound();
+        })
+        .WithName("GetTransaction")
+        .WithSummary("Get a financial transaction");
 
         return app;
     }
