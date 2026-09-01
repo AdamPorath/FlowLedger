@@ -1,11 +1,13 @@
 using FlowLedger.Transactions.Api.Domain.Entities;
 using FlowLedger.Transactions.Api.Domain.ValueObjects;
+using FlowLedger.Transactions.Api.Infrastructure.Persistence;
 
 namespace FlowLedger.Transactions.Api.Application.Commands.CreateTransaction;
 
-public sealed class CreateTransactionHandler
+public sealed class CreateTransactionHandler(
+    TransactionsDbContext dbContext)
 {
-    public Task<CreateTransactionResult> HandleAsync(
+    public async Task<CreateTransactionResult> HandleAsync(
         string merchantId,
         CreateTransactionCommand command,
         CancellationToken cancellationToken)
@@ -22,11 +24,13 @@ public sealed class CreateTransactionHandler
             command.Description,
             command.CreatedBy);
 
-        var result = new CreateTransactionResult(
+        dbContext.Transactions.Add(transaction);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return new CreateTransactionResult(
             transaction.Id,
             transaction.CreatedAt);
-
-        return Task.FromResult(result);
     }
 }
 

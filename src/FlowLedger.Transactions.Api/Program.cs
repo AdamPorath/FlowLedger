@@ -1,9 +1,12 @@
 using FlowLedger.Transactions.Api.Endpoints;
 using FlowLedger.Transactions.Api.Application.Commands.CreateTransaction;
+using FlowLedger.Transactions.Api.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+
+builder.AddNpgsqlDbContext<TransactionsDbContext>("flowledger");
 
 builder.Services.AddOpenApi();
 
@@ -18,7 +21,7 @@ if (app.Environment.IsDevelopment())
 
 app.MapDefaultEndpoints();
 
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection();
 
 app.MapTransactionsEndpoints();
 
