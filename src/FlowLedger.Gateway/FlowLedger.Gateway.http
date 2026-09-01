@@ -1,0 +1,6 @@
+@FlowLedger.Gateway_HostAddress = http://localhost:5109
+
+GET {{FlowLedger.Gateway_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

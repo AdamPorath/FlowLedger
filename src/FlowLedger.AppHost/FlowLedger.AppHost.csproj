@@ -1,0 +1,20 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.5.3">
+
+  <ItemGroup>
+    <ProjectReference Include="..\FlowLedger.Gateway\FlowLedger.Gateway.csproj" />
+    <ProjectReference Include="..\FlowLedger.Transactions.Api\FlowLedger.Transactions.Api.csproj" />
+    <ProjectReference Include="..\FlowLedger.Consolidation.Api\FlowLedger.Consolidation.Api.csproj" />
+    <ProjectReference Include="..\FlowLedger.Consolidation.Worker\FlowLedger.Consolidation.Worker.csproj" />
+    <ProjectReference Include="..\FlowLedger.Identity.Api\FlowLedger.Identity.Api.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AspireUseCliBundle>true</AspireUseCliBundle>
+    <UserSecretsId>d4dcab6c-7e51-4d7a-bc11-e90efb81c31d</UserSecretsId>
+  </PropertyGroup>
+
+</Project>
