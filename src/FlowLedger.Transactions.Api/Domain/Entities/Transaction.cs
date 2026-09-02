@@ -1,10 +1,12 @@
 using FlowLedger.Transactions.Api.Domain.Enums;
 using FlowLedger.Transactions.Api.Domain.ValueObjects;
+using FlowLedger.Transactions.Api.Domain.Events;
 
 namespace FlowLedger.Transactions.Api.Domain.Entities;
 
 public sealed class Transaction
 {
+    private readonly List<IDomainEvent> _domainEvents = [];
     public Guid Id { get; private set; }
     public string MerchantId { get; private set; } = null!;
     public DateOnly ReferenceDate { get; private set; }
@@ -34,6 +36,16 @@ public sealed class Transaction
         Description = description;
         CreatedBy = createdBy;
         CreatedAt = DateTimeOffset.UtcNow;
+
+        RaiseDomainEvent(
+            new TransactionCreated(
+                Id,
+                MerchantId,
+                ReferenceDate,
+                Amount.Amount,
+                Amount.Currency
+            )
+        );
     }
 
     public static Transaction Create(
@@ -95,5 +107,13 @@ public sealed class Transaction
             description,
             createdBy
         );
+    }
+
+    public IReadOnlyCollection<IDomainEvent> DomainEvents =>
+        _domainEvents.AsReadOnly();
+
+    private void RaiseDomainEvent(IDomainEvent domainEvent)
+    {
+        _domainEvents.Add(domainEvent);
     }
 }

@@ -2,13 +2,21 @@ using FlowLedger.Transactions.Api.Endpoints;
 using FlowLedger.Transactions.Api.Application.Commands.CreateTransaction;
 using FlowLedger.Transactions.Api.Application.Queries.GetTransaction;
 using FlowLedger.Transactions.Api.Infrastructure.Persistence;
+using FlowLedger.Transactions.Api.Infrastructure.DomainEvents;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
-builder.AddNpgsqlDbContext<TransactionsDbContext>("flowledger");
+builder.Services.AddScoped<DomainEventInterceptor>();
+
+builder.Services.AddDbContext<TransactionsDbContext>(options =>
+    {
+        options.UseNpgsql(
+            builder.Configuration.GetConnectionString("flowledger"));
+    }
+);
 
 builder.Services.AddOpenApi();
 
@@ -30,7 +38,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapDefaultEndpoints();
-// app.UseProductionHttpsSecurity();
+
 // app.UseHttpsRedirection();
 
 app.MapTransactionsEndpoints();
