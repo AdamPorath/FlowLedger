@@ -1,15 +1,14 @@
-using System.Text.Json;
 using FlowLedger.Transactions.Api.Domain.Entities;
-using FlowLedger.Transactions.Api.Infrastructure.Outbox;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using FlowLedger.Transactions.Api.Infrastructure.Persistence;
+using MassTransit;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace FlowLedger.Transactions.Api.Infrastructure.DomainEvents;
 
-public sealed class DomainEventInterceptor : SaveChangesInterceptor
+public sealed class DomainEventInterceptor(
+    Func<IPublishEndpoint> publishEndpointAccessor) : SaveChangesInterceptor
 {
-    public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+    public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
         DbContextEventData eventData,
         InterceptionResult<int> result,
         CancellationToken cancellationToken = default)
@@ -18,7 +17,7 @@ public sealed class DomainEventInterceptor : SaveChangesInterceptor
 
         if (dbContext is null)
         {
-            return base.SavingChangesAsync(
+            return await base.SavingChangesAsync(
                 eventData,
                 result,
                 cancellationToken);
@@ -30,31 +29,32 @@ public sealed class DomainEventInterceptor : SaveChangesInterceptor
             .Select(entry => entry.Entity)
             .ToList();
 
-        foreach (var transaction in transactions)
+        if (transactions.Count > 0)
         {
-            foreach (var domainEvent in transaction.DomainEvents)
-            {
-                var integrationEvent = IntegrationEventMapper.Map(domainEvent);
+            var publishEndpoint = publishEndpointAccessor();
 
-                if (integrationEvent is null)
+            foreach (var transaction in transactions)
+            {
+                foreach (var domainEvent in transaction.DomainEvents)
                 {
-                    continue;
+                    var integrationEvent = IntegrationEventMapper.Map(domainEvent);
+
+                    if (integrationEvent is null)
+                    {
+                        continue;
+                    }
+
+                    await publishEndpoint.Publish(
+                        integrationEvent,
+                        integrationEvent.GetType(),
+                        cancellationToken);
                 }
 
-                var outboxMessage = new OutboxMessage(
-                    integrationEvent.GetType().FullName!,
-                    JsonSerializer.Serialize(
-                        integrationEvent,
-                        integrationEvent.GetType()),
-                    integrationEvent.OccurredOn);
-
-                dbContext.OutboxMessages.Add(outboxMessage);
+                transaction.ClearDomainEvents();
             }
-
-            transaction.ClearDomainEvents();
         }
 
-        return base.SavingChangesAsync(
+        return await base.SavingChangesAsync(
             eventData,
             result,
             cancellationToken);
