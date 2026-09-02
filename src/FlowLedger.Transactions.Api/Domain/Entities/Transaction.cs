@@ -112,6 +112,11 @@ public sealed class Transaction
     public IReadOnlyCollection<IDomainEvent> DomainEvents =>
         _domainEvents.AsReadOnly();
 
+    public void ClearDomainEvents()
+    {
+        _domainEvents.Clear();
+    }
+
     private void RaiseDomainEvent(IDomainEvent domainEvent)
     {
         _domainEvents.Add(domainEvent);

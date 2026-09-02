@@ -1,5 +1,6 @@
 using FlowLedger.Transactions.Api.Domain.Entities;
 using FlowLedger.Transactions.Api.Infrastructure.DomainEvents;
+using FlowLedger.Transactions.Api.Infrastructure.Outbox;
 using Microsoft.EntityFrameworkCore;
 
 namespace FlowLedger.Transactions.Api.Infrastructure.Persistence;
@@ -10,6 +11,8 @@ public sealed class TransactionsDbContext(
     : DbContext(options)
 {
     public DbSet<Transaction> Transactions => Set<Transaction>();
+
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnConfiguring(
         DbContextOptionsBuilder optionsBuilder)
