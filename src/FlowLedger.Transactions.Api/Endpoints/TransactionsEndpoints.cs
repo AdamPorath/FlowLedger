@@ -29,7 +29,7 @@ public static class TransactionsEndpoints
                 result);
         })
         .WithName("CreateTransaction")
-        .WithSummary("Create a financial transaction by a merchant");
+        .WithSummary("Create a financial transaction");
 
         group.MapGet("/{id:guid}", async (
             Guid id,
