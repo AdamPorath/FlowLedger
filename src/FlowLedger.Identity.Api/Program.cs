@@ -1,41 +1,47 @@
+using FlowLedger.Identity.Api.Application.Commands.Login;
+using FlowLedger.Identity.Api.Domain.Entities;
+using FlowLedger.Identity.Api.Endpoints;
+using FlowLedger.Identity.Api.Infrastructure.Security;
+using FlowLedger.Identity.Api.Infrastructure.Users;
+using Microsoft.AspNetCore.Identity;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+builder.AddServiceDefaults();
+
+builder.Services.Configure<JwtOptions>(
+    builder.Configuration.GetSection(JwtOptions.SectionName));
+
+builder.Services.AddSingleton<InMemoryUserStore>();
+builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
+builder.Services.AddSingleton<JwtTokenGenerator>();
+builder.Services.AddScoped<LoginHandler>();
+
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+
+    var userStore = app.Services.GetRequiredService<InMemoryUserStore>();
+    var passwordHasher = app.Services.GetRequiredService<IPasswordHasher<User>>();
+
+    var seedUser = new User
+    {
+        Id = Guid.NewGuid(),
+        Username = "merchant-test",
+        MerchantId = "merchant-test",
+    };
+    seedUser.PasswordHash = passwordHasher.HashPassword(seedUser, "Passw0rd!");
+
+    userStore.Add(seedUser);
 }
 
-app.UseHttpsRedirection();
+app.MapDefaultEndpoints();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+app.MapAuthEndpoints();
 
 app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
