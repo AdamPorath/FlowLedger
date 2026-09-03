@@ -34,6 +34,12 @@ builder.Services.AddMassTransit(x =>
 
         cfg.ReceiveEndpoint("consolidation-transaction-created", e =>
         {
+            e.UseMessageRetry(r => r.Exponential(
+                retryLimit: 5,
+                minInterval: TimeSpan.FromSeconds(1),
+                maxInterval: TimeSpan.FromSeconds(30),
+                intervalDelta: TimeSpan.FromSeconds(5)));
+
             e.UseEntityFrameworkOutbox<ConsolidationDbContext>(context);
 
             e.ConfigureConsumer<TransactionCreatedConsumer>(context);
