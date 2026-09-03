@@ -8,7 +8,7 @@ var consolidationDatabase = postgres.AddDatabase("consolidation");
 
 var rabbitmq = builder.AddRabbitMQ("messaging");
 
-builder.AddProject<Projects.FlowLedger_Transactions_Api>("transactions")
+var transactionsApi = builder.AddProject<Projects.FlowLedger_Transactions_Api>("transactions-api")
     .WithReference(database)
     .WithReference(rabbitmq);
 
@@ -16,7 +16,11 @@ builder.AddProject<Projects.FlowLedger_Consolidation_Worker>("consolidation-work
     .WithReference(consolidationDatabase)
     .WithReference(rabbitmq);
 
-builder.AddProject<Projects.FlowLedger_Consolidation_Api>("consolidation-api")
+var consolidationApi = builder.AddProject<Projects.FlowLedger_Consolidation_Api>("consolidation-api")
     .WithReference(consolidationDatabase);
+
+builder.AddProject<Projects.FlowLedger_Gateway>("gateway")
+    .WithReference(transactionsApi)
+    .WithReference(consolidationApi);
 
 builder.Build().Run();
