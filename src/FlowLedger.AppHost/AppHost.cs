@@ -19,10 +19,11 @@ builder.AddProject<Projects.FlowLedger_Consolidation_Worker>("consolidation-work
 var consolidationApi = builder.AddProject<Projects.FlowLedger_Consolidation_Api>("consolidation-api")
     .WithReference(consolidationDatabase);
 
-builder.AddProject<Projects.FlowLedger_Identity_Api>("identity-api");
+var identityApi = builder.AddProject<Projects.FlowLedger_Identity_Api>("identity-api");
 
 builder.AddProject<Projects.FlowLedger_Gateway>("gateway")
     .WithReference(transactionsApi)
-    .WithReference(consolidationApi);
+    .WithReference(consolidationApi)
+    .WithReference(identityApi);
 
 builder.Build().Run();
