@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using FlowLedger.Transactions.Api.Application.Commands.CreateTransaction;
 using FlowLedger.Transactions.Api.Application.Queries.GetTransaction;
 
@@ -9,15 +10,21 @@ public static class TransactionsEndpoints
         this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/transactions")
-            .WithTags("Transactions");
+            .WithTags("Transactions")
+            .RequireAuthorization();
 
         group.MapPost("/", async (
             CreateTransactionCommand command,
             CreateTransactionHandler handler,
+            ClaimsPrincipal user,
             CancellationToken cancellationToken) =>
         {
-            // Its just for test purposes
-            const string merchantId = "merchant-test";
+            var merchantId = user.FindFirstValue("merchantId");
+
+            if (merchantId is null)
+            {
+                return Results.Unauthorized();
+            }
 
             var result = await handler.HandleAsync(
                 merchantId,
@@ -34,10 +41,19 @@ public static class TransactionsEndpoints
         group.MapGet("/{id:guid}", async (
             Guid id,
             GetTransactionHandler handler,
+            ClaimsPrincipal user,
             CancellationToken cancellationToken) =>
         {
+            var merchantId = user.FindFirstValue("merchantId");
+
+            if (merchantId is null)
+            {
+                return Results.Unauthorized();
+            }
+
             var result = await handler.HandleAsync(
                 id,
+                merchantId,
                 cancellationToken);
 
             return result is not null

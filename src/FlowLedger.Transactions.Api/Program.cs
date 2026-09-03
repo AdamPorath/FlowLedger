@@ -1,14 +1,47 @@
+using System.Text;
 using FlowLedger.Transactions.Api.Endpoints;
 using FlowLedger.Transactions.Api.Application.Commands.CreateTransaction;
 using FlowLedger.Transactions.Api.Application.Queries.GetTransaction;
 using FlowLedger.Transactions.Api.Infrastructure.Persistence;
 using FlowLedger.Transactions.Api.Infrastructure.DomainEvents;
 using MassTransit;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+
+var jwtSection = builder.Configuration.GetSection("Jwt");
+
+var jwtIssuer = jwtSection["Issuer"]
+    ?? throw new InvalidOperationException("Jwt:Issuer was not configured.");
+
+var jwtAudience = jwtSection["Audience"]
+    ?? throw new InvalidOperationException("Jwt:Audience was not configured.");
+
+var jwtSigningKey = jwtSection["SigningKey"]
+    ?? throw new InvalidOperationException("Jwt:SigningKey was not configured.");
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtIssuer,
+            ValidateAudience = true,
+            ValidAudience = jwtAudience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtSigningKey)),
+            ValidateLifetime = true,
+        };
+    });
+
+builder.Services.AddAuthorization();
 
 builder.Services.AddScoped<DomainEventInterceptor>();
 
@@ -65,6 +98,9 @@ if (app.Environment.IsDevelopment())
 app.MapDefaultEndpoints();
 
 // app.UseHttpsRedirection();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapTransactionsEndpoints();
 

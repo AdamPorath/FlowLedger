@@ -8,11 +8,12 @@ public sealed class GetTransactionHandler(
 {
     public async Task<GetTransactionResponse?> HandleAsync(
         Guid id,
+        string merchantId,
         CancellationToken cancellationToken)
     {
         return await dbContext.Transactions
             .AsNoTracking()
-            .Where(x => x.Id == id)
+            .Where(x => x.Id == id && x.MerchantId == merchantId)
             .Select(x => new GetTransactionResponse(
                 x.Id,
                 x.MerchantId,
