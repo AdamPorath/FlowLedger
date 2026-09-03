@@ -21,6 +21,11 @@ var rabbitMqConnectionString =
 
 builder.Services.AddMassTransit(x =>
 {
+    x.AddEntityFrameworkOutbox<ConsolidationDbContext>(o =>
+    {
+        o.UsePostgres();
+    });
+
     x.AddConsumer<TransactionCreatedConsumer>();
 
     x.UsingRabbitMq((context, cfg) =>
@@ -29,6 +34,8 @@ builder.Services.AddMassTransit(x =>
 
         cfg.ReceiveEndpoint("consolidation-transaction-created", e =>
         {
+            e.UseEntityFrameworkOutbox<ConsolidationDbContext>(context);
+
             e.ConfigureConsumer<TransactionCreatedConsumer>(context);
         });
     });

@@ -31,8 +31,6 @@ public sealed class DomainEventInterceptor(
 
         if (transactions.Count > 0)
         {
-            // Resolve IPublishEndpoint lazily to avoid a circular dependency during DbContext construction.
-            // MassTransit's bus outbox requires the DbContext to already exist when the endpoint is resolved.
             var publishEndpoint = publishEndpointAccessor();
 
             foreach (var transaction in transactions)
@@ -49,6 +47,7 @@ public sealed class DomainEventInterceptor(
                     await publishEndpoint.Publish(
                         integrationEvent,
                         integrationEvent.GetType(),
+                        context => context.MessageId = integrationEvent.EventId,
                         cancellationToken);
                 }
 

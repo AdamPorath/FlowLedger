@@ -1,5 +1,7 @@
 using FlowLedger.Consolidation.Worker.Domain;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace FlowLedger.Consolidation.Worker.Infrastructure.Persistence;
 
@@ -9,6 +11,13 @@ public sealed class ConsolidationDbContext(
 {
     public DbSet<ConsolidatedBalance> ConsolidatedBalances =>
         Set<ConsolidatedBalance>();
+
+    protected override void OnConfiguring(
+        DbContextOptionsBuilder optionsBuilder)
+    {
+        optionsBuilder.ConfigureWarnings(
+            w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -28,5 +37,9 @@ public sealed class ConsolidationDbContext(
 
             builder.Ignore(x => x.Balance);
         });
+
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+        modelBuilder.AddOutboxStateEntity();
     }
 }

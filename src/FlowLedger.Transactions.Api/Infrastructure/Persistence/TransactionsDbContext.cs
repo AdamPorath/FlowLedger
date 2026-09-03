@@ -21,7 +21,6 @@ public sealed class TransactionsDbContext(
             optionsBuilder.AddInterceptors(domainEventInterceptor);
         }
 
-       // MassTransit's Outbox model is enriched at runtime via AddEntityFrameworkOutbox, which design-time tooling does not reproduce identically, causing a false positive in EF Core model validation; ignoring it is the recommended approach for this scenario.
         optionsBuilder.ConfigureWarnings(
             w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
     }
