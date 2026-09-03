@@ -24,6 +24,7 @@ var identityApi = builder.AddProject<Projects.FlowLedger_Identity_Api>("identity
 builder.AddProject<Projects.FlowLedger_Gateway>("gateway")
     .WithReference(transactionsApi)
     .WithReference(consolidationApi)
-    .WithReference(identityApi);
+    .WithReference(identityApi)
+    .WithExternalHttpEndpoints();
 
 builder.Build().Run();
