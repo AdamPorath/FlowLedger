@@ -14,15 +14,32 @@ public sealed class TransactionCreatedConsumer(
     {
         var message = context.Message;
 
-        dbContext.ConsolidatedTransactions.Add(new ConsolidatedTransaction
+        var balance = await dbContext.ConsolidatedBalances.FindAsync(
+            [message.MerchantId, message.ReferenceDate, message.Currency],
+            context.CancellationToken);
+
+        if (balance is null)
         {
-            TransactionId = message.TransactionId,
-            MerchantId = message.MerchantId,
-            ReferenceDate = message.ReferenceDate,
-            Amount = message.Amount,
-            Currency = message.Currency,
-            ConsolidatedAt = DateTimeOffset.UtcNow,
-        });
+            balance = new ConsolidatedBalance
+            {
+                MerchantId = message.MerchantId,
+                ReferenceDate = message.ReferenceDate,
+                Currency = message.Currency,
+            };
+
+            dbContext.ConsolidatedBalances.Add(balance);
+        }
+
+        if (message.TransactionType == TransactionType.Credit)
+        {
+            balance.TotalCredits += message.Amount;
+        }
+        else
+        {
+            balance.TotalDebits += message.Amount;
+        }
+
+        balance.UpdatedAt = DateTimeOffset.UtcNow;
 
         await dbContext.SaveChangesAsync(context.CancellationToken);
     }

@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FlowLedger.Consolidation.Worker.Migrations
 {
     [DbContext(typeof(ConsolidationDbContext))]
-    [Migration("20260902223447_InitialCreate")]
+    [Migration("20260903123220_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -25,34 +25,31 @@ namespace FlowLedger.Consolidation.Worker.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("FlowLedger.Consolidation.Worker.Domain.ConsolidatedTransaction", b =>
+            modelBuilder.Entity("FlowLedger.Consolidation.Worker.Domain.ConsolidatedBalance", b =>
                 {
-                    b.Property<Guid>("TransactionId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTimeOffset>("ConsolidatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)");
-
                     b.Property<string>("MerchantId")
-                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
                     b.Property<DateOnly>("ReferenceDate")
                         .HasColumnType("date");
 
-                    b.HasKey("TransactionId");
+                    b.Property<string>("Currency")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
 
-                    b.ToTable("consolidated_transactions", (string)null);
+                    b.Property<decimal>("TotalCredits")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("TotalDebits")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("MerchantId", "ReferenceDate", "Currency");
+
+                    b.ToTable("consolidated_balances", (string)null);
                 });
 #pragma warning restore 612, 618
         }

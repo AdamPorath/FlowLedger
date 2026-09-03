@@ -16,4 +16,7 @@ builder.AddProject<Projects.FlowLedger_Consolidation_Worker>("consolidation-work
     .WithReference(consolidationDatabase)
     .WithReference(rabbitmq);
 
+builder.AddProject<Projects.FlowLedger_Consolidation_Api>("consolidation-api")
+    .WithReference(consolidationDatabase);
+
 builder.Build().Run();

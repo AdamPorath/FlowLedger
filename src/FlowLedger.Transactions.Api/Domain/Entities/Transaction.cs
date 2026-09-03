@@ -42,6 +42,7 @@ public sealed class Transaction
                 Id,
                 MerchantId,
                 ReferenceDate,
+                Type,
                 Amount.Amount,
                 Amount.Currency
             )

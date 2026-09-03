@@ -7,16 +7,16 @@ public sealed class ConsolidationDbContext(
     DbContextOptions<ConsolidationDbContext> options)
     : DbContext(options)
 {
-    public DbSet<ConsolidatedTransaction> ConsolidatedTransactions =>
-        Set<ConsolidatedTransaction>();
+    public DbSet<ConsolidatedBalance> ConsolidatedBalances =>
+        Set<ConsolidatedBalance>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<ConsolidatedTransaction>(builder =>
+        modelBuilder.Entity<ConsolidatedBalance>(builder =>
         {
-            builder.ToTable("consolidated_transactions");
+            builder.ToTable("consolidated_balances");
 
-            builder.HasKey(x => x.TransactionId);
+            builder.HasKey(x => new { x.MerchantId, x.ReferenceDate, x.Currency });
 
             builder.Property(x => x.MerchantId)
                 .HasMaxLength(100)
@@ -25,6 +25,8 @@ public sealed class ConsolidationDbContext(
             builder.Property(x => x.Currency)
                 .HasMaxLength(3)
                 .IsRequired();
+
+            builder.Ignore(x => x.Balance);
         });
     }
 }

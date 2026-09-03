@@ -12,7 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FlowLedger.ServiceDefaults\FlowLedger.ServiceDefaults.csproj" />
-    <ProjectReference Include="..\FlowLedger.Contracts\FlowLedger.Contracts.csproj" />
+    <ProjectReference Include="..\FlowLedger.Consolidation.Worker\FlowLedger.Consolidation.Worker.csproj" />
   </ItemGroup>
 
 </Project>

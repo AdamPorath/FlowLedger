@@ -12,19 +12,19 @@ namespace FlowLedger.Consolidation.Worker.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "consolidated_transactions",
+                name: "consolidated_balances",
                 columns: table => new
                 {
-                    TransactionId = table.Column<Guid>(type: "uuid", nullable: false),
                     MerchantId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     ReferenceDate = table.Column<DateOnly>(type: "date", nullable: false),
-                    Amount = table.Column<decimal>(type: "numeric", nullable: false),
                     Currency = table.Column<string>(type: "character varying(3)", maxLength: 3, nullable: false),
-                    ConsolidatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    TotalCredits = table.Column<decimal>(type: "numeric", nullable: false),
+                    TotalDebits = table.Column<decimal>(type: "numeric", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_consolidated_transactions", x => x.TransactionId);
+                    table.PrimaryKey("PK_consolidated_balances", x => new { x.MerchantId, x.ReferenceDate, x.Currency });
                 });
         }
 
@@ -32,7 +32,7 @@ namespace FlowLedger.Consolidation.Worker.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "consolidated_transactions");
+                name: "consolidated_balances");
         }
     }
 }
