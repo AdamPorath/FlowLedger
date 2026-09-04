@@ -181,8 +181,11 @@ jobs:
 
       - name: Test
         run: |
+          set -o pipefail
+          mkdir -p ./TestResults
           dotnet test tests/FlowLedger.E2E.Tests/FlowLedger.E2E.Tests.csproj -c Release \
-            --logger "trx;LogFileName=e2e-tests.trx" --results-directory ./TestResults
+            --logger "trx;LogFileName=e2e-tests.trx" --logger "console;verbosity=detailed" \
+            --results-directory ./TestResults | tee ./TestResults/e2e-tests.log
 
       - name: Publish test results
         if: always()
@@ -191,6 +194,14 @@ jobs:
           name: End-to-end test results
           path: "TestResults/*.trx"
           reporter: dotnet-trx
+
+      - name: Upload E2E console log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-tests-console-log
+          path: ./TestResults/e2e-tests.log
+          retention-days: 7
 
   container-security-scan:
     name: Container image scan (${{ matrix.name }})
