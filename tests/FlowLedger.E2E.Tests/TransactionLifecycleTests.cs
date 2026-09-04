@@ -47,11 +47,7 @@ public sealed class TransactionLifecycleTests : IAsyncLifetime
             "/api/v1/auth/login",
             new { Username = "merchant-test", Password = "Passw0rd!" });
 
-        if (!loginResponse.IsSuccessStatusCode)
-        {
-            var loginResponseBody = await loginResponse.Content.ReadAsStringAsync();
-            Assert.Fail($"Login failed. StatusCode: {loginResponse.StatusCode}, Body: {loginResponseBody}");
-        }
+        Assert.True(loginResponse.IsSuccessStatusCode);
 
         var login = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
         Assert.NotNull(login);
@@ -74,11 +70,8 @@ public sealed class TransactionLifecycleTests : IAsyncLifetime
                 Description = "e2e-test-transaction",
                 CreatedBy = "e2e-test",
             });
-        if (!createResponse.IsSuccessStatusCode)
-        {
-            var createResponseBody = await createResponse.Content.ReadAsStringAsync();
-            Assert.Fail($"StatusCode: {createResponse.StatusCode}, Body: {createResponseBody}");
-        }
+
+        Assert.True(createResponse.IsSuccessStatusCode);
 
         var deadline = DateTime.UtcNow.AddSeconds(30);
         DailyBalanceResponse? balance = null;
