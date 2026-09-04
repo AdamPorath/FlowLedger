@@ -55,6 +55,9 @@ builder.Services.AddDbContext<TransactionsDbContext>(options =>
     }
 );
 
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<TransactionsDbContext>("database", tags: ["ready"]);
+
 var rabbitMqConnectionString =
     builder.Configuration.GetConnectionString("messaging")
     ?? throw new InvalidOperationException(

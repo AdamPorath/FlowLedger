@@ -1,3 +1,5 @@
+using Azure.Provisioning.AppContainers;
+
 var builder = DistributedApplication.CreateBuilder(args);
 
 var isPublishMode = builder.ExecutionContext.IsPublishMode;
@@ -13,23 +15,11 @@ IResourceBuilder<IResourceWithConnectionString> rabbitmq;
 
 if (isPublishMode)
 {
-    // --- Secrets (production only) ----------------------------------------------------------
-    // Aspire's own secret-parameter pipeline resolves and injects these values at
-    // publish/deploy time. They are additionally stored in Azure Key Vault so there is a
-    // durable, auditable, rotatable record of every secret used in production, independent
-    // of the deploy pipeline.
     var keyVault = builder.AddAzureKeyVault("key-vault");
 
     jwtSigningKey = builder.AddParameter("jwt-signing-key", secret: true);
     keyVault.AddSecret("jwt-signing-key-secret", jwtSigningKey);
 
-    // --- PostgreSQL --------------------------------------------------------------------------
-    // AddAzurePostgresFlexibleServer defaults to passwordless Microsoft Entra ID
-    // authentication. The existing EF Core wiring in Transactions.Api/Consolidation.Api/
-    // Consolidation.Worker uses a plain `UseNpgsql(connectionString)` call (not Aspire's
-    // AddNpgsqlDbContext client integration), so it cannot consume rotating AAD tokens. Since
-    // EF Core code must not be changed, password authentication is configured explicitly
-    // instead of relying on the passwordless default.
     var postgresUsername = builder.AddParameter("postgres-admin-username", secret: true);
     var postgresPassword = builder.AddParameter("postgres-admin-password", secret: true);
     keyVault.AddSecret("postgres-admin-password-secret", postgresPassword);
@@ -40,10 +30,6 @@ if (isPublishMode)
     database = postgres.AddDatabase("flowledger");
     consolidationDatabase = postgres.AddDatabase("consolidation");
 
-    // --- Messaging ---------------------------------------------------------------------------
-    // Aspire has no native Azure hosting integration for a managed RabbitMQ service, so the
-    // production broker (e.g. CloudAMQP) is modeled as an external connection string.
-    // MassTransit's `UsingRabbitMq` transport code is unchanged either way.
     var rabbitMqConnectionString = builder.AddParameter("rabbitmq-connection-string", secret: true);
     keyVault.AddSecret("rabbitmq-connection-string-secret", rabbitMqConnectionString);
 
@@ -53,7 +39,6 @@ if (isPublishMode)
 }
 else
 {
-    // Local/dev: unchanged - plain Postgres and RabbitMQ containers, exactly as before.
     var postgres = builder.AddPostgres("postgres");
     database = postgres.AddDatabase("flowledger");
     consolidationDatabase = postgres.AddDatabase("consolidation");
@@ -82,24 +67,57 @@ var gateway = builder.AddProject<Projects.FlowLedger_Gateway>("gateway")
 
 if (isPublishMode)
 {
-    // Every service that validates or issues JWTs needs the shared signing key in production;
-    // locally each service keeps reading it from its own user secrets/appsettings, unchanged.
     transactionsApi.WithEnvironment("Jwt__SigningKey", jwtSigningKey!);
     consolidationApi.WithEnvironment("Jwt__SigningKey", jwtSigningKey!);
     identityApi.WithEnvironment("Jwt__SigningKey", jwtSigningKey!);
     gateway.WithEnvironment("Jwt__SigningKey", jwtSigningKey!);
 
-    // Consolidation.Worker has no HTTP endpoint/ingress at all (Generic Host, no Kestrel) and
-    // therefore no autoscale signal to ever wake it back up once scaled to zero. Force a
-    // permanently-running single replica so queued messages are always consumed. The four
-    // HTTP-facing services (gateway, transactions-api, consolidation-api, identity-api) are
-    // left at the Azure Container Apps Consumption-plan default (MinReplicas = 0), so they
-    // scale to zero when idle and scale up on incoming HTTP traffic.
+    gateway.PublishAsAzureContainerApp((_, app) => ConfigureHealthProbes(app));
+    transactionsApi.PublishAsAzureContainerApp((_, app) => ConfigureHealthProbes(app));
+    consolidationApi.PublishAsAzureContainerApp((_, app) => ConfigureHealthProbes(app));
+    identityApi.PublishAsAzureContainerApp((_, app) => ConfigureHealthProbes(app));
+
     consolidationWorker.PublishAsAzureContainerApp((_, app) =>
     {
         app.Template.Scale.MinReplicas = 1;
         app.Template.Scale.MaxReplicas = 1;
+
+        ConfigureHealthProbes(app);
     });
 }
 
 builder.Build().Run();
+
+static void ConfigureHealthProbes(ContainerApp app)
+{
+    var container = app.Template.Containers[0].Value!;
+    var targetPort = app.Configuration.Ingress.TargetPort;
+
+    container.Probes.Add(new ContainerAppProbe
+    {
+        ProbeType = ContainerAppProbeType.Liveness,
+        HttpGet = new ContainerAppHttpRequestInfo
+        {
+            Path = "/alive",
+            Port = targetPort,
+        },
+        InitialDelaySeconds = 10,
+        PeriodSeconds = 15,
+        FailureThreshold = 3,
+        TimeoutSeconds = 5,
+    });
+
+    container.Probes.Add(new ContainerAppProbe
+    {
+        ProbeType = ContainerAppProbeType.Readiness,
+        HttpGet = new ContainerAppHttpRequestInfo
+        {
+            Path = "/health",
+            Port = targetPort,
+        },
+        InitialDelaySeconds = 5,
+        PeriodSeconds = 10,
+        FailureThreshold = 3,
+        TimeoutSeconds = 5,
+    });
+}

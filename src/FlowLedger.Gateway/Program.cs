@@ -78,12 +78,17 @@ forwardedHeadersOptions.KnownIPNetworks.Clear();
 forwardedHeadersOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedHeadersOptions);
 
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHsts();
-}
+app.UseWhen(
+    context => !context.Request.Path.StartsWithSegments("/health") && !context.Request.Path.StartsWithSegments("/alive"),
+    branch =>
+    {
+        if (!app.Environment.IsDevelopment())
+        {
+            branch.UseHsts();
+        }
 
-app.UseHttpsRedirection();
+        branch.UseHttpsRedirection();
+    });
 
 app.Use(async (context, next) =>
 {

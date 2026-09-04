@@ -3,7 +3,7 @@ using FlowLedger.Consolidation.Worker.Infrastructure.Persistence;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
-var builder = Host.CreateApplicationBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
@@ -13,6 +13,9 @@ builder.Services.AddDbContext<ConsolidationDbContext>(options =>
             builder.Configuration.GetConnectionString("consolidation"));
     }
 );
+
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<ConsolidationDbContext>("database", tags: ["ready"]);
 
 var rabbitMqConnectionString =
     builder.Configuration.GetConnectionString("messaging")
@@ -58,5 +61,7 @@ if (builder.Environment.IsDevelopment())
 
     await dbContext.Database.MigrateAsync();
 }
+
+host.MapDefaultEndpoints();
 
 host.Run();

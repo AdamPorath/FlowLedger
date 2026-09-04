@@ -3,6 +3,7 @@ using FlowLedger.Consolidation.Worker.Infrastructure.Persistence;
 using FlowLedger.Contracts.IntegrationEvents.Transactions;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
 namespace FlowLedger.Consolidation.UnitTests.Consumers;
@@ -36,7 +37,7 @@ public sealed class TransactionCreatedConsumerTests
         TransactionType transactionType)
     {
         await using var dbContext = CreateDbContext();
-        var consumer = new TransactionCreatedConsumer(dbContext);
+        var consumer = new TransactionCreatedConsumer(dbContext, NullLogger<TransactionCreatedConsumer>.Instance);
 
         var message = new TransactionCreatedIntegrationEvent(
             Guid.NewGuid(), "merchant-1", new DateOnly(2026, 9, 3), transactionType, 150m, "BRL");
@@ -54,7 +55,7 @@ public sealed class TransactionCreatedConsumerTests
     public async Task Consume_MultipleTransactionsForSameMerchant_AccumulatesOnSameBalance()
     {
         await using var dbContext = CreateDbContext();
-        var consumer = new TransactionCreatedConsumer(dbContext);
+        var consumer = new TransactionCreatedConsumer(dbContext, NullLogger<TransactionCreatedConsumer>.Instance);
         var referenceDate = new DateOnly(2026, 9, 3);
 
         await consumer.Consume(CreateContext(new TransactionCreatedIntegrationEvent(
@@ -75,7 +76,7 @@ public sealed class TransactionCreatedConsumerTests
     public async Task Consume_DifferentMerchantCurrencyOrDate_CreatesSeparateBalances()
     {
         await using var dbContext = CreateDbContext();
-        var consumer = new TransactionCreatedConsumer(dbContext);
+        var consumer = new TransactionCreatedConsumer(dbContext, NullLogger<TransactionCreatedConsumer>.Instance);
 
         await consumer.Consume(CreateContext(new TransactionCreatedIntegrationEvent(
             Guid.NewGuid(), "merchant-1", new DateOnly(2026, 9, 3), TransactionType.Credit, 100m, "BRL")));
@@ -95,7 +96,7 @@ public sealed class TransactionCreatedConsumerTests
     public async Task Consume_ExistingBalance_UpdatesUpdatedAtTimestamp()
     {
         await using var dbContext = CreateDbContext();
-        var consumer = new TransactionCreatedConsumer(dbContext);
+        var consumer = new TransactionCreatedConsumer(dbContext, NullLogger<TransactionCreatedConsumer>.Instance);
         var referenceDate = new DateOnly(2026, 9, 3);
 
         await consumer.Consume(CreateContext(new TransactionCreatedIntegrationEvent(

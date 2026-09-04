@@ -17,6 +17,7 @@ public static class Extensions
 {
     private const string HealthEndpointPath = "/health";
     private const string AlivenessEndpointPath = "/alive";
+    private const string HealthChecksPolicyName = "HealthChecks";
 
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
@@ -57,11 +58,15 @@ public static class Extensions
             {
                 metrics.AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
-                    .AddRuntimeInstrumentation();
+                    .AddRuntimeInstrumentation()
+                    .AddMeter(builder.Environment.ApplicationName)
+                    .AddMeter("MassTransit");
             })
             .WithTracing(tracing =>
             {
                 tracing.AddSource(builder.Environment.ApplicationName)
+                    .AddSource("MassTransit")
+                    .AddSource("Npgsql")
                     .AddAspNetCoreInstrumentation(tracing =>
                         // Exclude health check requests from tracing
                         tracing.Filter = context =>
@@ -99,6 +104,12 @@ public static class Extensions
 
     public static TBuilder AddDefaultHealthChecks<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
+        builder.Services.AddRequestTimeouts(configure: static timeouts =>
+            timeouts.AddPolicy(HealthChecksPolicyName, TimeSpan.FromSeconds(5)));
+
+        builder.Services.AddOutputCache(configureOptions: static caching =>
+            caching.AddPolicy(HealthChecksPolicyName, build: static policy => policy.Expire(TimeSpan.FromSeconds(10))));
+
         builder.Services.AddHealthChecks()
             // Add a default liveness check to ensure app is responsive
             .AddCheck("self", () => HealthCheckResult.Healthy(), ["live"]);
@@ -108,19 +119,21 @@ public static class Extensions
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
-        // Adding health checks endpoints to applications in non-development environments has security implications.
-        // See https://aka.ms/aspire/healthchecks for details before enabling these endpoints in non-development environments.
-        if (app.Environment.IsDevelopment())
-        {
-            // All health checks must pass for app to be considered ready to accept traffic after starting
-            app.MapHealthChecks(HealthEndpointPath);
+        app.UseRequestTimeouts();
+        app.UseOutputCache();
 
-            // Only health checks tagged with the "live" tag must pass for app to be considered alive
-            app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
-            {
-                Predicate = r => r.Tags.Contains("live")
-            });
-        }
+        var healthChecks = app.MapGroup("");
+
+        healthChecks.CacheOutput(HealthChecksPolicyName).WithRequestTimeout(HealthChecksPolicyName);
+
+        // All health checks must pass for app to be considered ready to accept traffic after starting
+        healthChecks.MapHealthChecks(HealthEndpointPath);
+
+        // Only health checks tagged with the "live" tag must pass for app to be considered alive
+        healthChecks.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
+        {
+            Predicate = r => r.Tags.Contains("live")
+        });
 
         return app;
     }

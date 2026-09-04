@@ -37,7 +37,7 @@ public static class ConsolidationEndpoints
                 : Results.NotFound();
         })
         .WithName("GetDailyBalance")
-        .WithSummary("Get the consolidated daily balance for a merchant");
+        .WithSummary("Get the consolidated daily balance for merchant");
 
         return app;
     }

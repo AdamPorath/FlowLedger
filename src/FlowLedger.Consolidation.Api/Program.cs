@@ -47,6 +47,9 @@ builder.Services.AddDbContext<ConsolidationDbContext>(options =>
     }
 );
 
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<ConsolidationDbContext>("database", tags: ["ready"]);
+
 builder.Services.AddOpenApi();
 
 builder.Services.AddScoped<GetDailyBalanceHandler>();
