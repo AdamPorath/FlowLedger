@@ -53,7 +53,12 @@ public sealed class TransactionLifecycleTests : IAsyncLifetime
         var loginResponse = await client.PostAsJsonAsync(
             "/api/v1/auth/login",
             new { Username = "merchant-test", Password = "Passw0rd!" });
-        Assert.True(loginResponse.IsSuccessStatusCode);
+
+        if (!loginResponse.IsSuccessStatusCode)
+        {
+            var loginResponseBody = await loginResponse.Content.ReadAsStringAsync();
+            Assert.Fail($"Login failed. StatusCode: {loginResponse.StatusCode}, Body: {loginResponseBody}");
+        }
 
         var login = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
         Assert.NotNull(login);
