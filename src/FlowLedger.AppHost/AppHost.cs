@@ -93,6 +93,8 @@ static void ConfigureHealthProbes(ContainerApp app)
     var container = app.Template.Containers[0].Value!;
     var targetPort = app.Configuration.Ingress.TargetPort;
 
+    app.Template.TerminationGracePeriodSeconds = 45;
+
     container.Probes.Add(new ContainerAppProbe
     {
         ProbeType = ContainerAppProbeType.Liveness,
