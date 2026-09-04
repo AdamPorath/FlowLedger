@@ -33,6 +33,11 @@ public sealed class TransactionLifecycleTests : IAsyncLifetime
             "gateway",
             KnownResourceStates.Running)
             .WaitAsync(TimeSpan.FromMinutes(3));
+
+        await _notifications.WaitForResourceAsync(
+            "transactions-api",
+            KnownResourceStates.Running)
+            .WaitAsync(TimeSpan.FromMinutes(3));
     }
 
     public async Task DisposeAsync()
