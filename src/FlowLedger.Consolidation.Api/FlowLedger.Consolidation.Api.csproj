@@ -17,4 +17,11 @@
     <ProjectReference Include="..\FlowLedger.Consolidation.Worker\FlowLedger.Consolidation.Worker.csproj" />
   </ItemGroup>
 
+  <Target Name="RemoveWorkerAppSettingsFromPublish" BeforeTargets="_HandleFileConflictsForPublish">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+        Condition="$([System.String]::new('%(Identity)').Contains('FlowLedger.Consolidation.Worker')) and $([System.String]::new('%(Filename)').StartsWith('appsettings'))" />
+    </ItemGroup>
+  </Target>
+
 </Project>
