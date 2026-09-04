@@ -1,0 +1,268 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_VERSION: "10.0.x"
+
+jobs:
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore FlowLedger.slnx
+
+      - name: Verify formatting
+        run: dotnet format FlowLedger.slnx --verify-no-changes --no-restore
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore FlowLedger.slnx
+
+      - name: Build
+        run: dotnet build FlowLedger.slnx --no-restore -c Release
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Test
+        run: |
+          dotnet test tests/FlowLedger.Transactions.UnitTests/FlowLedger.Transactions.UnitTests.csproj -c Release \
+            --logger "trx;LogFileName=transactions-unit-tests.trx" --results-directory ./TestResults
+          dotnet test tests/FlowLedger.Consolidation.UnitTests/FlowLedger.Consolidation.UnitTests.csproj -c Release \
+            --logger "trx;LogFileName=consolidation-unit-tests.trx" --results-directory ./TestResults
+
+      - name: Publish test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Unit test results
+          path: "TestResults/*.trx"
+          reporter: dotnet-trx
+
+  architecture-tests:
+    name: Architecture tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Test
+        run: |
+          dotnet test tests/FlowLedger.ArchitectureTests/FlowLedger.ArchitectureTests.csproj -c Release \
+            --logger "trx;LogFileName=architecture-tests.trx" --results-directory ./TestResults
+
+      - name: Publish test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Architecture test results
+          path: "TestResults/*.trx"
+          reporter: dotnet-trx
+
+  integration-tests:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Test
+        run: |
+          dotnet test tests/FlowLedger.Transactions.IntegrationTests/FlowLedger.Transactions.IntegrationTests.csproj -c Release \
+            --logger "trx;LogFileName=transactions-integration-tests.trx" --results-directory ./TestResults
+          dotnet test tests/FlowLedger.Consolidation.IntegrationTests/FlowLedger.Consolidation.IntegrationTests.csproj -c Release \
+            --logger "trx;LogFileName=consolidation-integration-tests.trx" --results-directory ./TestResults
+
+      - name: Publish test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Integration test results
+          path: "TestResults/*.trx"
+          reporter: dotnet-trx
+
+  e2e-tests:
+    name: End-to-end tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Test
+        run: |
+          dotnet test tests/FlowLedger.E2E.Tests/FlowLedger.E2E.Tests.csproj -c Release \
+            --logger "trx;LogFileName=e2e-tests.trx" --results-directory ./TestResults
+
+      - name: Publish test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: End-to-end test results
+          path: "TestResults/*.trx"
+          reporter: dotnet-trx
+
+  container-security-scan:
+    name: Container image scan (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: transactions-api
+            project: src/FlowLedger.Transactions.Api/FlowLedger.Transactions.Api.csproj
+          - name: consolidation-api
+            project: src/FlowLedger.Consolidation.Api/FlowLedger.Consolidation.Api.csproj
+          - name: consolidation-worker
+            project: src/FlowLedger.Consolidation.Worker/FlowLedger.Consolidation.Worker.csproj
+          - name: identity-api
+            project: src/FlowLedger.Identity.Api/FlowLedger.Identity.Api.csproj
+          - name: gateway
+            project: src/FlowLedger.Gateway/FlowLedger.Gateway.csproj
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Build container image
+        run: |
+          dotnet publish ${{ matrix.project }} -c Release --os linux --arch x64 /t:PublishContainer \
+            -p:ContainerRepository=flowledger/${{ matrix.name }} \
+            -p:ContainerImageTag=${{ github.sha }}
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: flowledger/${{ matrix.name }}:${{ github.sha }}
+          format: sarif
+          output: trivy-${{ matrix.name }}.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "0"
+
+      - name: Upload scan results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.name }}.sarif
+          category: trivy-${{ matrix.name }}
+
+  ci-gate:
+    name: CI gate
+    if: always()
+    needs:
+      - format
+      - build
+      - unit-tests
+      - architecture-tests
+      - integration-tests
+      - e2e-tests
+      - container-security-scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any required check failed
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more CI checks did not succeed."
+            exit 1
+          fi
+          echo "All CI checks succeeded for $GITHUB_SHA."

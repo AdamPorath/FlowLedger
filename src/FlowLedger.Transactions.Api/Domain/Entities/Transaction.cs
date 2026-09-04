@@ -63,7 +63,6 @@ public sealed class Transaction
             "MerchantId is required.",
             nameof(merchantId));
         }
-        
 
         if (!Enum.IsDefined(typeof(TransactionType), type))
         {

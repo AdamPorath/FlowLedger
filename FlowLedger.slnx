@@ -12,6 +12,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/FlowLedger.ArchitectureTests/FlowLedger.ArchitectureTests.csproj" />
     <Project Path="tests/FlowLedger.Consolidation.IntegrationTests/FlowLedger.Consolidation.IntegrationTests.csproj" />
+    <Project Path="tests/FlowLedger.E2E.Tests/FlowLedger.E2E.Tests.csproj" />
     <Project Path="tests/FlowLedger.Consolidation.UnitTests/FlowLedger.Consolidation.UnitTests.csproj" />
     <Project Path="tests/FlowLedger.Transactions.IntegrationTests/FlowLedger.Transactions.IntegrationTests.csproj" />
     <Project Path="tests/FlowLedger.Transactions.UnitTests/FlowLedger.Transactions.UnitTests.csproj" />

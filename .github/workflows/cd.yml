@@ -1,0 +1,179 @@
+name: CD
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: >
+          Tag to deploy (e.g. v1.4.2). Defaults to the tag that triggered this run.
+          Set this to an older tag to roll back to a previously released version.
+        required: false
+        type: string
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_VERSION: "10.0.x"
+  ASPIRE_CLI_VERSION: "13.5.3"
+  DEPLOY_REF: ${{ github.event.inputs.ref || github.ref_name }}
+
+jobs:
+  verify:
+    name: Verify before deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_REF }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore and build
+        run: |
+          dotnet restore FlowLedger.slnx
+          dotnet build FlowLedger.slnx --no-restore -c Release
+
+      - name: Run fast tests
+        run: |
+          dotnet test tests/FlowLedger.Transactions.UnitTests/FlowLedger.Transactions.UnitTests.csproj -c Release --no-build
+          dotnet test tests/FlowLedger.Consolidation.UnitTests/FlowLedger.Consolidation.UnitTests.csproj -c Release --no-build
+          dotnet test tests/FlowLedger.ArchitectureTests/FlowLedger.ArchitectureTests.csproj -c Release --no-build
+
+  deploy:
+    name: Deploy to Azure
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      deployed-sha: ${{ steps.resolve-sha.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_REF }}
+          fetch-depth: 0
+
+      - name: Resolve deployed commit SHA
+        id: resolve-sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install Aspire CLI
+        run: dotnet tool install -g Aspire.Cli --version ${{ env.ASPIRE_CLI_VERSION }}
+
+      - name: aspire deploy
+        env:
+          Azure__SubscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          Azure__ResourceGroup: ${{ vars.AZURE_RESOURCE_GROUP }}
+          Azure__Location: ${{ vars.AZURE_LOCATION }}
+          Azure__CredentialSource: AzureCli
+          Parameters__jwt-signing-key: ${{ secrets.JWT_SIGNING_KEY }}
+          Parameters__postgres-admin-username: ${{ secrets.POSTGRES_ADMIN_USERNAME }}
+          Parameters__postgres-admin-password: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
+          Parameters__rabbitmq-connection-string: ${{ secrets.RABBITMQ_CONNECTION_STRING }}
+        run: |
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          aspire deploy \
+            --apphost src/FlowLedger.AppHost/FlowLedger.AppHost.csproj \
+            --environment production \
+            --non-interactive
+
+      - name: Record deployment traceability
+        run: |
+          {
+            echo "## Production deployment"
+            echo ""
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Tag / ref | \`${{ env.DEPLOY_REF }}\` |"
+            echo "| Commit SHA | \`${{ steps.resolve-sha.outputs.sha }}\` |"
+            echo "| Triggered by | ${{ github.actor }} |"
+            echo "| Workflow run | [$GITHUB_RUN_ID](${{ github.server_url }}/${{ github.repository }}/actions/runs/$GITHUB_RUN_ID) |"
+            echo "| Aspire CLI | ${{ env.ASPIRE_CLI_VERSION }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  migrate:
+    name: Apply database migrations
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_REF }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install dotnet-ef
+        run: dotnet tool install -g dotnet-ef
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve Postgres host
+        id: resolve-postgres
+        run: |
+          set -euo pipefail
+          host=$(az postgres flexible-server list \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --query "[0].fullyQualifiedDomainName" -o tsv)
+          echo "host=$host" >> "$GITHUB_OUTPUT"
+
+      - name: Apply Transactions.Api migrations
+        env:
+          PGHOST: ${{ steps.resolve-postgres.outputs.host }}
+          PGUSER: ${{ secrets.POSTGRES_ADMIN_USERNAME }}
+          PGPASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
+        run: |
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet ef database update \
+            --project src/FlowLedger.Transactions.Api/FlowLedger.Transactions.Api.csproj \
+            --connection "Host=$PGHOST;Database=flowledger;Username=$PGUSER;Password=$PGPASSWORD;Ssl Mode=Require"
+
+      - name: Apply Consolidation.Worker migrations
+        env:
+          PGHOST: ${{ steps.resolve-postgres.outputs.host }}
+          PGUSER: ${{ secrets.POSTGRES_ADMIN_USERNAME }}
+          PGPASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
+        run: |
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet ef database update \
+            --project src/FlowLedger.Consolidation.Worker/FlowLedger.Consolidation.Worker.csproj \
+            --connection "Host=$PGHOST;Database=consolidation;Username=$PGUSER;Password=$PGPASSWORD;Ssl Mode=Require"
