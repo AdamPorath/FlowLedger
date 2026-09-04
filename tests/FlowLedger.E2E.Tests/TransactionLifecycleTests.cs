@@ -29,19 +29,7 @@ public sealed class TransactionLifecycleTests : IAsyncLifetime
 
         await _app.StartAsync();
 
-        await _notifications.WaitForResourceAsync(
-            "gateway",
-            KnownResourceStates.Running)
-            .WaitAsync(TimeSpan.FromMinutes(3));
-
-        await _notifications.WaitForResourceAsync(
-            "transactions-api",
-            KnownResourceStates.Running)
-            .WaitAsync(TimeSpan.FromMinutes(3));
-
-        await _notifications.WaitForResourceAsync(
-            "identity-api",
-            KnownResourceStates.Running)
+        await _notifications.WaitForResourceHealthyAsync("gateway")
             .WaitAsync(TimeSpan.FromMinutes(3));
     }
 
