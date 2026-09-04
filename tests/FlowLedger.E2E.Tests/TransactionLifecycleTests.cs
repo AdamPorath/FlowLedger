@@ -16,6 +16,14 @@ public sealed class TransactionLifecycleTests : IAsyncLifetime
         var appHost = await DistributedApplicationTestingBuilder
             .CreateAsync<Projects.FlowLedger_AppHost>();
 
+        appHost.Services.ConfigureHttpClientDefaults(clientBuilder =>
+        {
+            clientBuilder.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = (_, _, _, _) => true,
+            });
+        });
+
         _app = await appHost.BuildAsync();
         _notifications = _app.Services.GetRequiredService<ResourceNotificationService>();
 
