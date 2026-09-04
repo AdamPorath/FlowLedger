@@ -76,10 +76,11 @@ public sealed class TransactionLifecycleTests : IAsyncLifetime
                 Description = "e2e-test-transaction",
                 CreatedBy = "e2e-test",
             });
-        var createResponseBody = await createResponse.Content.ReadAsStringAsync();
-        Assert.True(
-            createResponse.IsSuccessStatusCode,
-            $"StatusCode: {createResponse.StatusCode}, Body: {createResponseBody}");
+        if (!createResponse.IsSuccessStatusCode)
+        {
+            var createResponseBody = await createResponse.Content.ReadAsStringAsync();
+            Assert.Fail($"StatusCode: {createResponse.StatusCode}, Body: {createResponseBody}");
+        }
 
         var deadline = DateTime.UtcNow.AddSeconds(30);
         DailyBalanceResponse? balance = null;
