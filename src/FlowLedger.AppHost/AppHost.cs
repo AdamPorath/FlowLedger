@@ -48,22 +48,34 @@ else
 
 var transactionsApi = builder.AddProject<Projects.FlowLedger_Transactions_Api>("transactions-api")
     .WithReference(database)
-    .WithReference(rabbitmq);
+    .WithReference(rabbitmq)
+    .WithHttpHealthCheck("/health")
+    .WaitFor(database)
+    .WaitFor(rabbitmq);
 
 var consolidationWorker = builder.AddProject<Projects.FlowLedger_Consolidation_Worker>("consolidation-worker")
     .WithReference(consolidationDatabase)
-    .WithReference(rabbitmq);
+    .WithReference(rabbitmq)
+    .WaitFor(consolidationDatabase)
+    .WaitFor(rabbitmq);
 
 var consolidationApi = builder.AddProject<Projects.FlowLedger_Consolidation_Api>("consolidation-api")
-    .WithReference(consolidationDatabase);
+    .WithReference(consolidationDatabase)
+    .WithHttpHealthCheck("/health")
+    .WaitFor(consolidationDatabase);
 
-var identityApi = builder.AddProject<Projects.FlowLedger_Identity_Api>("identity-api");
+var identityApi = builder.AddProject<Projects.FlowLedger_Identity_Api>("identity-api")
+    .WithHttpHealthCheck("/health");
 
 var gateway = builder.AddProject<Projects.FlowLedger_Gateway>("gateway")
     .WithReference(transactionsApi)
     .WithReference(consolidationApi)
     .WithReference(identityApi)
-    .WithExternalHttpEndpoints();
+    .WithExternalHttpEndpoints()
+    .WithHttpHealthCheck("/health")
+    .WaitFor(transactionsApi)
+    .WaitFor(consolidationApi)
+    .WaitFor(identityApi);
 
 if (isPublishMode)
 {
